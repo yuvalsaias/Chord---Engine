@@ -1,3 +1,8 @@
+import collections
+import collections.abc
+
+collections.MutableSequence = collections.abc.MutableSequence
+
 from fastapi import FastAPI, UploadFile, File
 import tempfile
 import madmom
