@@ -3,11 +3,13 @@ import collections.abc
 
 collections.MutableSequence = collections.abc.MutableSequence
 
+import numpy as np
+np.float = float
+
 from fastapi import FastAPI, UploadFile, File
 import tempfile
 import madmom
 import librosa
-import numpy as np
 
 app = FastAPI()
 
