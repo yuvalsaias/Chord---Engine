@@ -6,5 +6,3 @@ numpy
 scipy
 soundfile
 ffmpeg-python
-git+https://github.com/ptnghia-j/ChordMini.git
-
