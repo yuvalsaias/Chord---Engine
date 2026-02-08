@@ -18,8 +18,77 @@ app = FastAPI()
 # Simple chord classifier
 # ---------------------------
 CHORDS = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
+CHORD_TEMPLATES = {
+    "maj":[0,4,7],
+    "min":[0,3,7],
+    "dim":[0,3,6],
+    "aug":[0,4,8],
+
+    "7":[0,4,7,10],
+    "maj7":[0,4,7,11],
+    "m7":[0,3,7,10],
+    "mMaj7":[0,3,7,11],
+
+    "sus2":[0,2,7],
+    "sus4":[0,5,7],
+
+    "add9":[0,4,7,14],
+    "madd9":[0,3,7,14],
+
+    "9":[0,4,7,10,14],
+    "m9":[0,3,7,10,14],
+
+    "6":[0,4,7,9],
+    "m6":[0,3,7,9]
+}
 
 def classify_chord(chroma):
+    NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
+
+def detect_chord_from_chroma(chroma):
+    def detect_bass_note(segment, sr):
+
+    S = np.abs(librosa.stft(segment))
+    freqs = librosa.fft_frequencies(sr=sr)
+
+    bass_energy = np.mean(S[freqs < 200], axis=1)
+
+    if len(bass_energy) == 0:
+        return None
+
+    idx = np.argmax(bass_energy)
+    freq = freqs[idx]
+
+    midi = librosa.hz_to_midi(freq)
+    note = int(round(midi)) % 12
+
+    return NOTE_NAMES[note]
+
+
+    best_score = 0
+    best_chord = "N"
+
+    chroma = chroma / np.sum(chroma)
+
+    for root in range(12):
+
+        for quality, intervals in CHORD_TEMPLATES.items():
+
+            template = np.zeros(12)
+
+            for interval in intervals:
+                template[(root + interval) % 12] = 1
+
+            template = template / np.sum(template)
+
+            score = np.dot(chroma, template)
+
+            if score > best_score:
+                best_score = score
+                best_chord = NOTE_NAMES[root] + quality
+
+    return best_chord
+
     return CHORDS[np.argmax(chroma)]
 
 # ---------------------------
@@ -56,7 +125,13 @@ def chords_per_beat(y, sr, beat_times):
         chroma = librosa.feature.chroma_stft(y=segment, sr=sr)
         chroma_mean = np.mean(chroma, axis=1)
 
-        chord = classify_chord(chroma_mean)
+        chord = detect_chord_from_chroma(chroma_mean)
+
+bass = detect_bass_note(segment, sr)
+
+if bass and not chord.startswith(bass):
+    chord = chord + "/" + bass
+
 
         chords.append({
             "beat_time": float(beat_times[i]),
@@ -64,6 +139,30 @@ def chords_per_beat(y, sr, beat_times):
         })
 
     return chords
+def smooth_chords(chords):
+
+    smoothed = []
+
+    for i in range(len(chords)):
+
+        curr = chords[i]["chord"]
+
+        if i > 0 and i < len(chords)-1:
+
+            prev = chords[i-1]["chord"]
+            next = chords[i+1]["chord"]
+
+            if prev == next and curr != prev:
+                curr = prev
+
+        smoothed.append({
+            "beat_time": chords[i]["beat_time"],
+            "chord": curr
+        })
+
+    return smoothed
+
+
 
 
 # ---------------------------
