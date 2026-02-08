@@ -105,6 +105,44 @@ def group_bars(chords, beats_per_bar=4):
 @app.post("/analyze")
 async def analyze(file: UploadFile = File(...)):
 
+    tmp = tempfile.NamedTemporaryFile(delete=False)
+    audio_path = tmp.name
+
+    try:
+        # שמירת הקובץ
+        content = await file.read()
+        tmp.write(content)
+        tmp.close()
+
+        print("File saved:", audio_path)
+
+        # טעינת אודיו
+        y, sr = librosa.load(audio_path, sr=None)
+        print("Audio loaded. SR:", sr)
+
+        # Beat detection
+        beat_times = detect_beats(audio_path)
+        print("Beats detected:", len(beat_times))
+
+        # Chords
+        chords = chords_per_beat(y, sr, beat_times)
+        print("Chords detected:", len(chords))
+
+        # Bars
+        bars = group_bars(chords)
+
+        return {"bars": bars}
+
+    except Exception as e:
+        print("ERROR:", str(e))
+        return {"error": str(e)}
+
+    finally:
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
+
+async def analyze(file: UploadFile = File(...)):
+
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         tmp.write(await file.read())
         audio_path = tmp.name
