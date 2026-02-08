@@ -31,26 +31,33 @@ def detect_beats(audio_path):
 # ---------------------------------------------------
 # CREMA chord detection
 # ---------------------------------------------------
+# ---------------------------------------------------
+# CREMA chord detection
+# ---------------------------------------------------
 def detect_chords_crema(audio_path):
 
     y, sr = librosa.load(audio_path, sr=44100, mono=True)
 
     model = crema.models.chord.ChordModel()
 
-    # ✅ FIX HERE
     result = model.predict(y=y, sr=sr)
 
     chords = []
 
-    for interval, label in zip(result.intervals, result.labels):
+    for seg in result.data:
+
+        start = float(seg.time)
+        end = float(seg.time + seg.duration)
+        chord = str(seg.value)
 
         chords.append({
-            "start": float(interval[0]),
-            "end": float(interval[1]),
-            "chord": label
+            "start": start,
+            "end": end,
+            "chord": chord
         })
 
     return chords
+
 
 
 # ---------------------------------------------------
