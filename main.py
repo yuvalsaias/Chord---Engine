@@ -1,13 +1,17 @@
 import collections
 import collections.abc
+import numpy as np
 
 collections.MutableSequence = collections.abc.MutableSequence
 collections.MutableMapping = collections.abc.MutableMapping
 collections.Sequence = collections.abc.Sequence
 
+np.float = float
+np.int = int
+np.bool = bool
+
 from fastapi import FastAPI, UploadFile, File
 import librosa
-import numpy as np
 import tempfile
 import madmom.features.beats as beats
 
