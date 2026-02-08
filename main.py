@@ -1,38 +1,116 @@
-import os
-import tempfile
-from fastapi import FastAPI, UploadFile, File
+import collections
+import collections.abc
+collections.MutableSequence = collections.abc.MutableSequence
+collections.MutableMapping = collections.abc.MutableMapping
+collections.Sequence = collections.abc.Sequence
 
-from omnizart.chord import app as chord_app
-from omnizart.utils import io
+from fastapi import FastAPI, UploadFile, File
+import tempfile
+import os
+import numpy as np
+import librosa
+import madmom.features.beats as beats
+import crema
 
 app = FastAPI()
 
-# ---------------------------
-# Convert Omnizart output to chart bars
-# ---------------------------
+# ---------------------------------------------------
+# Beat detection (Madmom)
+# ---------------------------------------------------
+def detect_beats(audio_path):
 
-def omnizart_to_chart(chord_list):
+    proc = beats.RNNBeatProcessor()
+    act = proc(audio_path)
+
+    tracker = beats.DBNBeatTrackingProcessor(fps=100)
+    beat_times = tracker(act)
+
+    return beat_times
+
+
+# ---------------------------------------------------
+# CREMA chord detection
+# ---------------------------------------------------
+def detect_chords_crema(audio_path):
+
+    result = crema.analyze(audio_path)
+
+    chords = []
+
+    for seg in result["chord"]:
+
+        chords.append({
+            "start": float(seg["start"]),
+            "end": float(seg["end"]),
+            "chord": seg["chord"]
+        })
+
+    return chords
+
+
+# ---------------------------------------------------
+# Align chords to beats
+# ---------------------------------------------------
+def align_chords_to_beats(chord_segments, beat_times):
+
+    beat_chords = []
+
+    for beat in beat_times:
+
+        current = "N"
+
+        for seg in chord_segments:
+            if seg["start"] <= beat < seg["end"]:
+                current = seg["chord"]
+                break
+
+        beat_chords.append({
+            "beat_time": float(beat),
+            "chord": current
+        })
+
+    return beat_chords
+
+
+# ---------------------------------------------------
+# Remove duplicate consecutive chords
+# ---------------------------------------------------
+def compress_chords(chords):
+
+    compressed = []
+
+    last = None
+
+    for c in chords:
+
+        if c["chord"] != last:
+            compressed.append(c)
+
+        last = c["chord"]
+
+    return compressed
+
+
+# ---------------------------------------------------
+# Group into bars
+# ---------------------------------------------------
+def group_bars(chords, beats_per_bar=4):
 
     bars = []
     current_bar = []
     beat_counter = 0
     bar_number = 1
 
-    for chord in chord_list:
-
-        label = chord[2]
-
-        if label == "N":
-            continue
+    for c in chords:
 
         current_bar.append({
             "beat": beat_counter + 1,
-            "chord": label
+            "chord": c["chord"]
         })
 
         beat_counter += 1
 
-        if beat_counter == 4:
+        if beat_counter == beats_per_bar:
 
             bars.append({
                 "bar": bar_number,
@@ -45,10 +123,10 @@ def omnizart_to_chart(chord_list):
 
     return bars
 
-# ---------------------------
-# API Endpoint
-# ---------------------------
 
+# ---------------------------------------------------
+# API Endpoint
+# ---------------------------------------------------
 @app.post("/analyze")
 async def analyze(file: UploadFile = File(...)):
 
@@ -56,21 +134,29 @@ async def analyze(file: UploadFile = File(...)):
     audio_path = tmp.name
 
     try:
+
         content = await file.read()
         tmp.write(content)
         tmp.close()
 
-        # 🔥 Deep ML chord recognition
-        result = chord_app.transcribe(audio_path)
+        # --- CREMA harmonic detection ---
+        chord_segments = detect_chords_crema(audio_path)
 
-        # result format:
-        # [ (start_time, end_time, chord_label), ... ]
+        # --- Beat detection ---
+        beat_times = detect_beats(audio_path)
 
-        bars = omnizart_to_chart(result)
+        # --- Align ---
+        beat_chords = align_chords_to_beats(chord_segments, beat_times)
+
+        # --- Remove jitter ---
+        beat_chords = compress_chords(beat_chords)
+
+        # --- Bars ---
+        bars = group_bars(beat_chords)
 
         return {
             "bars": bars,
-            "raw_chords": result
+            "segments": chord_segments
         }
 
     except Exception as e:
