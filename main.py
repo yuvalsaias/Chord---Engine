@@ -15,9 +15,10 @@ import madmom.features.beats as beats
 app = FastAPI()
 
 # ---------------------------
-# Simple chord classifier
+# Chord data
 # ---------------------------
 CHORDS = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
+
 CHORD_TEMPLATES = {
     "maj":[0,4,7],
     "min":[0,3,7],
@@ -42,11 +43,12 @@ CHORD_TEMPLATES = {
     "m6":[0,3,7,9]
 }
 
-def classify_chord(chroma):
-    NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
+NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 
-def detect_chord_from_chroma(chroma):
-    def detect_bass_note(segment, sr):
+# ---------------------------
+# Bass detection
+# ---------------------------
+def detect_bass_note(segment, sr):
 
     S = np.abs(librosa.stft(segment))
     freqs = librosa.fft_frequencies(sr=sr)
@@ -64,9 +66,16 @@ def detect_chord_from_chroma(chroma):
 
     return NOTE_NAMES[note]
 
+# ---------------------------
+# Chord detection
+# ---------------------------
+def detect_chord_from_chroma(chroma):
 
     best_score = 0
     best_chord = "N"
+
+    if np.sum(chroma) == 0:
+        return "N"
 
     chroma = chroma / np.sum(chroma)
 
@@ -89,8 +98,6 @@ def detect_chord_from_chroma(chroma):
 
     return best_chord
 
-    return CHORDS[np.argmax(chroma)]
-
 # ---------------------------
 # Beat Detection
 # ---------------------------
@@ -103,7 +110,6 @@ def detect_beats(audio_path):
     beat_times = tracker(act)
 
     return beat_times
-
 
 # ---------------------------
 # Chord detection per beat
@@ -127,11 +133,9 @@ def chords_per_beat(y, sr, beat_times):
 
         chord = detect_chord_from_chroma(chroma_mean)
 
-bass = detect_bass_note(segment, sr)
-
-if bass and not chord.startswith(bass):
-    chord = chord + "/" + bass
-
+        bass = detect_bass_note(segment, sr)
+        if bass and not chord.startswith(bass):
+            chord = chord + "/" + bass
 
         chords.append({
             "beat_time": float(beat_times[i]),
@@ -139,6 +143,10 @@ if bass and not chord.startswith(bass):
         })
 
     return chords
+
+# ---------------------------
+# Smoothing
+# ---------------------------
 def smooth_chords(chords):
 
     smoothed = []
@@ -161,9 +169,6 @@ def smooth_chords(chords):
         })
 
     return smoothed
-
-
-
 
 # ---------------------------
 # Group beats into bars
@@ -197,7 +202,6 @@ def group_bars(chords, beats_per_bar=4):
 
     return bars
 
-
 # ---------------------------
 # API Endpoint
 # ---------------------------
@@ -208,58 +212,24 @@ async def analyze(file: UploadFile = File(...)):
     audio_path = tmp.name
 
     try:
-        # שמירת הקובץ
         content = await file.read()
         tmp.write(content)
         tmp.close()
 
-        print("File saved:", audio_path)
-
-        # טעינת אודיו
         y, sr = librosa.load(audio_path, sr=None)
-        print("Audio loaded. SR:", sr)
 
-        # Beat detection
         beat_times = detect_beats(audio_path)
-        print("Beats detected:", len(beat_times))
 
-        # Chords
         chords = chords_per_beat(y, sr, beat_times)
-chords = smooth_chords(chords)
+        chords = smooth_chords(chords)
 
-        print("Chords detected:", len(chords))
-
-        # Bars
         bars = group_bars(chords)
 
         return {"bars": bars}
 
     except Exception as e:
-        print("ERROR:", str(e))
         return {"error": str(e)}
 
     finally:
         if os.path.exists(audio_path):
             os.remove(audio_path)
-
-async def analyze(file: UploadFile = File(...)):
-
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        tmp.write(await file.read())
-        audio_path = tmp.name
-
-    try:
-
-        # Load audio (keep original sample rate)
-        y, sr = librosa.load(audio_path, sr=None)
-
-        beat_times = detect_beats(audio_path)
-
-        chords = chords_per_beat(y, sr, beat_times)
-
-        bars = group_bars(chords)
-
-        return {"bars": bars}
-
-    finally:
-        os.remove(audio_path)
