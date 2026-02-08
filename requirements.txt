@@ -8,6 +8,9 @@ librosa==0.8.1
 madmom==0.16.1
 crema==0.2.0
 
+tensorflow==2.10.1
+keras==2.10.0
+
 soundfile
 python-multipart
 Cython==0.29.36
