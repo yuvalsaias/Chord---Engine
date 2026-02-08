@@ -145,7 +145,7 @@ def chords_per_beat(y, sr, beat_times):
     return chords
 
 # ---------------------------
-# Smoothing
+# Basic smoothing
 # ---------------------------
 def smooth_chords(chords):
 
@@ -169,6 +169,40 @@ def smooth_chords(chords):
         })
 
     return smoothed
+
+# ---------------------------
+# Harmonic stability filter
+# ---------------------------
+def harmonic_filter(chords, min_beats=2):
+
+    if not chords:
+        return chords
+
+    filtered = []
+
+    current = chords[0]
+    count = 1
+
+    for i in range(1, len(chords)):
+
+        if chords[i]["chord"] == current["chord"]:
+            count += 1
+        else:
+
+            if count >= min_beats:
+                filtered.extend([current] * count)
+            else:
+                if filtered:
+                    filtered.extend([filtered[-1]] * count)
+                else:
+                    filtered.extend([current] * count)
+
+            current = chords[i]
+            count = 1
+
+    filtered.extend([current] * count)
+
+    return filtered
 
 # ---------------------------
 # Group beats into bars
@@ -222,6 +256,7 @@ async def analyze(file: UploadFile = File(...)):
 
         chords = chords_per_beat(y, sr, beat_times)
         chords = smooth_chords(chords)
+        chords = harmonic_filter(chords)
 
         bars = group_bars(chords)
 
