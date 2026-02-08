@@ -1,3 +1,10 @@
+import collections
+import collections.abc
+
+collections.MutableSequence = collections.abc.MutableSequence
+collections.MutableMapping = collections.abc.MutableMapping
+collections.Sequence = collections.abc.Sequence
+
 from fastapi import FastAPI, UploadFile, File
 import librosa
 import numpy as np
