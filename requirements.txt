@@ -1,9 +1,9 @@
-Cython
 fastapi
 uvicorn
 madmom
 librosa
-numpy
-scipy
+numpy==1.23.5
+scipy==1.9.3
 soundfile
 python-multipart
+Cython
