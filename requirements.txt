@@ -7,3 +7,4 @@ scipy==1.9.3
 soundfile
 python-multipart
 Cython
+crema
