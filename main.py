@@ -1,14 +1,11 @@
 import collections
 import collections.abc
 import numpy as np
+import os
 
 collections.MutableSequence = collections.abc.MutableSequence
 collections.MutableMapping = collections.abc.MutableMapping
 collections.Sequence = collections.abc.Sequence
-
-np.float = float
-np.int = int
-np.bool = bool
 
 from fastapi import FastAPI, UploadFile, File
 import librosa
@@ -29,6 +26,7 @@ def classify_chord(chroma):
 # Beat Detection
 # ---------------------------
 def detect_beats(audio_path):
+
     proc = beats.RNNBeatProcessor()
     act = proc(audio_path)
 
@@ -36,6 +34,7 @@ def detect_beats(audio_path):
     beat_times = tracker(act)
 
     return beat_times
+
 
 # ---------------------------
 # Chord detection per beat
@@ -66,6 +65,7 @@ def chords_per_beat(y, sr, beat_times):
 
     return chords
 
+
 # ---------------------------
 # Group beats into bars
 # ---------------------------
@@ -79,7 +79,7 @@ def group_bars(chords, beats_per_bar=4):
     for c in chords:
 
         current_bar.append({
-            "beat": beat_counter+1,
+            "beat": beat_counter + 1,
             "chord": c["chord"]
         })
 
@@ -98,8 +98,9 @@ def group_bars(chords, beats_per_bar=4):
 
     return bars
 
+
 # ---------------------------
-# API
+# API Endpoint
 # ---------------------------
 @app.post("/analyze")
 async def analyze(file: UploadFile = File(...)):
@@ -108,14 +109,18 @@ async def analyze(file: UploadFile = File(...)):
         tmp.write(await file.read())
         audio_path = tmp.name
 
-    y, sr = librosa.load(audio_path)
+    try:
 
-    beat_times = detect_beats(audio_path)
+        # Load audio (keep original sample rate)
+        y, sr = librosa.load(audio_path, sr=None)
 
-    chords = chords_per_beat(y, sr, beat_times)
+        beat_times = detect_beats(audio_path)
 
-    bars = group_bars(chords)
+        chords = chords_per_beat(y, sr, beat_times)
 
-    return {
-        "bars": bars
-    }
+        bars = group_bars(chords)
+
+        return {"bars": bars}
+
+    finally:
+        os.remove(audio_path)
