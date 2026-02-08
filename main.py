@@ -225,6 +225,8 @@ async def analyze(file: UploadFile = File(...)):
 
         # Chords
         chords = chords_per_beat(y, sr, beat_times)
+chords = smooth_chords(chords)
+
         print("Chords detected:", len(chords))
 
         # Bars
