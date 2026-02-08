@@ -29,14 +29,16 @@ def detect_beats(audio_path):
 
 
 # ---------------------------------------------------
-# CREMA chord detection (FIXED)
+# CREMA chord detection
 # ---------------------------------------------------
 def detect_chords_crema(audio_path):
 
     y, sr = librosa.load(audio_path, sr=44100, mono=True)
 
     model = crema.models.chord.ChordModel()
-    result = model.predict(y, sr)
+
+    # ✅ FIX HERE
+    result = model.predict(y=y, sr=sr)
 
     chords = []
 
