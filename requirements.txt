@@ -1,10 +1,13 @@
 fastapi
 uvicorn
-madmom
-librosa
+
+librosa==0.9.2
 numpy==1.23.5
 scipy==1.9.3
 soundfile
+
 python-multipart
 Cython
+
+omnizart
 crema
